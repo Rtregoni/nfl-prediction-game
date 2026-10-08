@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFL Game Day Predictions</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="brand">🏈</div><div><h1>NFL Game Day Predictions</h1><p>8-player game day prediction challenge</p></div></header>
+<main>
+<div id="status" class="status">Connecting…</div>
+<section id="join" class="panel">
+<h2>Join the game</h2>
+<label>Game code<input id="gameCode" autocomplete="off" placeholder="e.g. LONDON26"></label>
+<label>Your name<input id="playerName" autocomplete="name" placeholder="Your name"></label>
+<button id="joinBtn">Enter predictions</button>
+<button id="adminBtn" class="secondary">Admin</button>
+</section>
+<section id="player" class="panel hidden">
+<div class="topline"><div><small>Playing as</small><strong id="playingAs"></strong></div><button id="changeBtn" class="secondary small">Change player</button></div>
+<h2 id="gameTitle">Predictions</h2>
+<form id="predictionForm">
+<div class="grid">
+<div class="field"><label>Q1 score</label><div class="score"><input id="q1h" type="number" min="0" required><span>–</span><input id="q1a" type="number" min="0" required></div></div>
+<div class="field"><label>Half-time score</label><div class="score"><input id="hth" type="number" min="0" required><span>–</span><input id="hta" type="number" min="0" required></div></div>
+<div class="field"><label>Q3 score</label><div class="score"><input id="q3h" type="number" min="0" required><span>–</span><input id="q3a" type="number" min="0" required></div></div>
+<div class="field"><label>Final score</label><div class="score"><input id="fh" type="number" min="0" required><span>–</span><input id="fa" type="number" min="0" required></div></div>
+<label>Attendance<input id="attendance" type="number" min="0" required></label>
+<label>Longest rushing TD (yards)<input id="rush" type="number" min="0" required></label>
+<label>Longest passing TD (yards)<input id="pass" type="number" min="0" required></label>
+<label>Longest field goal (yards)<input id="fg" type="number" min="0" required></label>
+</div><button id="submitBtn" type="submit">Submit predictions</button>
+<p id="lockMsg" class="note hidden">Predictions submitted and locked.</p></form>
+<div id="playerWinners"></div>
+</section>
+<section id="admin" class="panel hidden">
+<div class="topline"><h2>Admin</h2><button id="adminBackBtn" class="secondary small">Back</button></div>
+<p class="note">Create the game once, then update actual results as the game progresses.</p>
+<label>Admin code<input id="adminCode" type="password" placeholder="Choose an admin code"></label>
+<div class="grid">
+<label>Home team<input id="homeTeam" placeholder="Home team"></label><label>Away team<input id="awayTeam" placeholder="Away team"></label>
+</div><button id="createGameBtn">Create / load game</button>
+<div id="actuals" class="hidden"><h3>Actual results</h3><div class="grid">
+<div class="field"><label>Q1 score</label><div class="score"><input id="aq1h" type="number" min="0"><span>–</span><input id="aq1a" type="number" min="0"></div></div>
+<div class="field"><label>Half-time score</label><div class="score"><input id="ahth" type="number" min="0"><span>–</span><input id="ahta" type="number" min="0"></div></div>
+<div class="field"><label>Q3 score</label><div class="score"><input id="aq3h" type="number" min="0"><span>–</span><input id="aq3a" type="number" min="0"></div></div>
+<div class="field"><label>Final score</label><div class="score"><input id="afh" type="number" min="0"><span>–</span><input id="afa" type="number" min="0"></div></div>
+<label>Attendance<input id="aattendance" type="number" min="0"></label><label>Longest rushing TD<input id="arush" type="number" min="0"></label><label>Longest passing TD<input id="apass" type="number" min="0"></label><label>Longest field goal<input id="afg" type="number" min="0"></label>
+</div><button id="saveActualsBtn">Save actual results</button><div id="adminWinners"></div></div>
+</section>
+</main><footer>No points. No overall ranking. Just bragging rights. 🏆</footer>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body></html>
