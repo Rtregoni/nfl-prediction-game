@@ -1,0 +1,135 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const $ = id => document.getElementById(id);
+const show = id => $(id)?.classList.remove('hidden');
+const hide = id => $(id)?.classList.add('hidden');
+function msg(id,t,c=''){ const e=$(id); if(!e)return; e.textContent=t; e.className='msg '+c; }
+function code(v){ return v.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,24); }
+function name(v){ return v.trim().replace(/\s+/g,' ').slice(0,30); }
+function n(id){ const e=$(id); const v=e?.value?.trim() ?? ''; return v===''?null:Number(v); }
+
+let app, auth, db, user=null, gameId='', playerName='', unsubscribe=null;
+const cats=[['q1','Q1 score','score'],['ht','Half-time score','score'],['q3','Q3 score','score'],['final','Final score','score'],['attendance','Attendance','number'],['rush','Longest rushing TD','yards'],['pass','Longest passing TD','yards'],['fg','Longest field goal','yards']];
+
+function startupError(error){
+  console.error('NFL Predictions startup error:', error);
+  const detail = error?.message || String(error);
+  const box = $('startupError');
+  if(box){ box.innerHTML = `<strong>App connection error</strong><br><span>${detail.replace(/</g,'&lt;')}</span><br><small>Check Firebase setup, then refresh this page.</small>`; box.classList.remove('hidden'); }
+}
+
+try {
+  if(!firebaseConfig || firebaseConfig.apiKey?.startsWith('PASTE_') || firebaseConfig.projectId?.startsWith('PASTE_')) {
+    throw new Error('Firebase is not connected yet. Open firebase-config.js and paste the Firebase Web App configuration from your Firebase project.');
+  }
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch(error){ startupError(error); }
+
+function pred(prefix=''){ return {q1:{home:n(prefix+'q1h'),away:n(prefix+'q1a')},ht:{home:n(prefix+'hth'),away:n(prefix+'hta')},q3:{home:n(prefix+'q3h'),away:n(prefix+'q3a')},final:{home:n(prefix+'fh'),away:n(prefix+'fa')},attendance:n(prefix+'attendance'),rush:n(prefix+'rush'),pass:n(prefix+'pass'),fg:n(prefix+'fg')}; }
+function actualPred(){ return {q1:{home:n('aq1h'),away:n('aq1a')},ht:{home:n('ahth'),away:n('ahta')},q3:{home:n('aq3h'),away:n('aq3a')},final:{home:n('afh'),away:n('afa')},attendance:n('aattendance'),rush:n('arush'),pass:n('apass'),fg:n('afg')}; }
+function complete(p){ return cats.every(([k,,t])=>t==='score'?Number.isFinite(p[k]?.home)&&Number.isFinite(p[k]?.away):Number.isFinite(p[k])); }
+function dist(p,a,t){ return t==='score'?Math.abs(p.home-a.home)+Math.abs(p.away-a.away):Math.abs(p-a); }
+function fmt(v,t){ return t==='score'?`${v.home} – ${v.away}`:Number(v).toLocaleString()+(t==='yards'?' yards':''); }
+function render(id,g){
+  const box=$(id); if(!box)return; box.innerHTML='';
+  const actual=g?.actual||{}, players=g?.players||{};
+  for(const[k,title,t]of cats){
+    const card=document.createElement('div'); card.className='result';
+    const top=document.createElement('div'); top.className='resultTop';
+    top.innerHTML=`<span class="resultTitle">${title}</span><span class="pill">${actual[k]!=null?'Result entered':'Waiting'}</span>`; card.append(top);
+    if(actual[k]==null){const p=document.createElement('div');p.className='pending';p.textContent='Winner will appear when the actual result is entered.';card.append(p);box.append(card);continue;}
+    const a=document.createElement('div');a.className='actual';a.textContent='Actual: '+fmt(actual[k],t);card.append(a);
+    let best=Infinity,w=[];
+    for(const x of Object.values(players)){const p=x.predictions?.[k];if(p==null)continue;const d=dist(p,actual[k],t);if(d<best){best=d;w=[x.playerName]}else if(d===best)w.push(x.playerName);}
+    const win=document.createElement('div');win.className='winner';win.textContent=w.length?'🏆 '+w.join(' & '):'No prediction entered';card.append(win);box.append(card);
+  }
+}
+function watch(){
+  if(!db)return;
+  if(unsubscribe)unsubscribe();
+  unsubscribe=onSnapshot(doc(db,'games',gameId),s=>{
+    if(!s.exists())return;
+    const g=s.data(); render('playerResults',g); render('adminResults',g);
+    const c=Object.keys(g.players||{}).length;
+    $('playerStatus').textContent=c+' player'+(c===1?'':'s');
+    $('adminStatus').textContent=c+' player'+(c===1?'':'s');
+  },err=>startupError(err));
+}
+async function login(){
+  if(!auth)throw Error('Firebase has not started. Check the connection error shown at the top of the page.');
+  if(user)return user;
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const stop=onAuthStateChanged(auth,u=>{if(u&&!settled){settled=true;user=u;stop();resolve(u);}});
+    signInAnonymously(auth).catch(err=>{if(!settled){settled=true;stop();reject(err);}});
+  });
+}
+async function gameExists(id){
+  const s=await getDoc(doc(db,'games',id));
+  if(!s.exists())throw Error('That game does not exist yet. Ask the admin for the correct code.');
+  return s.data();
+}
+function fill(p){
+  if(!p)return;
+  const m={q1:['q1h','q1a'],ht:['hth','hta'],q3:['q3h','q3a'],final:['fh','fa']};
+  for(const[k,ids]of Object.entries(m)){if(p[k]){$(ids[0]).value=p[k].home;$(ids[1]).value=p[k].away;}}
+  for(const k of ['attendance','rush','pass','fg'])if(p[k]!=null)$(k).value=p[k];
+}
+
+$('joinForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  msg('joinMsg','');
+  try{
+    await login();
+    gameId=code($('gameCode').value); playerName=name($('playerName').value);
+    if(!gameId||!playerName)throw Error('Enter the game code and your name.');
+    const g=await gameExists(gameId); $('playerLabel').textContent=playerName;
+    const existing=g.players?.[user.uid]; fill(existing?.predictions);
+    if(existing?.submitted){$('predictionForm').querySelectorAll('input').forEach(x=>x.disabled=true);$('submitPred').disabled=true;msg('predMsg','Your predictions are already submitted and locked.','success');}
+    else{$('predictionForm').querySelectorAll('input').forEach(x=>x.disabled=false);$('submitPred').disabled=false;msg('predMsg','');}
+    switchTo('player'); watch();
+  }catch(err){console.error(err);msg('joinMsg',err.message||String(err),'error');}
+});
+
+$('predictionForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  try{
+    await login(); const p=pred();
+    if(!complete(p))throw Error('Please complete all eight predictions.');
+    const ref=doc(db,'games',gameId),s=await getDoc(ref); if(!s.exists())throw Error('Game not found.');
+    const g=s.data(),players={...(g.players||{})};
+    if(players[user.uid]?.submitted)throw Error('Your predictions are already locked.');
+    players[user.uid]={playerName,predictions:p,submitted:true,submittedAt:serverTimestamp()};
+    await setDoc(ref,{players},{merge:true});
+    $('predictionForm').querySelectorAll('input').forEach(x=>x.disabled=true); $('submitPred').disabled=true;
+    msg('predMsg','Predictions submitted and locked. Good luck!','success');
+  }catch(err){console.error(err);msg('predMsg',err.message||String(err),'error');}
+});
+
+$('playerExit').addEventListener('click',()=>{if(unsubscribe)unsubscribe();hide('player');show('join');});
+$('adminOpen').addEventListener('click',()=>{hide('join');show('admin');});
+$('adminExit').addEventListener('click',()=>{if(unsubscribe)unsubscribe();hide('admin');show('join');});
+$('gameForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  try{
+    await login(); gameId=code($('adminCode').value); if(!gameId)throw Error('Enter a game code.');
+    const old=await getDoc(doc(db,'games',gameId)),g=old.exists()?old.data():{};
+    await setDoc(doc(db,'games',gameId),{homeTeam:$('homeTeam').value.trim(),awayTeam:$('awayTeam').value.trim(),actual:g.actual||{},players:g.players||{},createdAt:g.createdAt||serverTimestamp()},{merge:true});
+    $('adminLabel').textContent=gameId;msg('gameMsg','Game ready. Share the code with the players.','success');watch();
+  }catch(err){console.error(err);msg('gameMsg',err.message||String(err),'error');}
+});
+$('actualForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  try{
+    if(!gameId)throw Error('Create or open a game first.');
+    const a=actualPred(),clean={};
+    for(const[k,v]of Object.entries(a))if(v!==null&&(typeof v!=='object'||(v.home!==null&&v.away!==null)))clean[k]=v;
+    await setDoc(doc(db,'games',gameId),{actual:clean},{merge:true}); msg('actualMsg','Actual results saved. Winners updated.','success');
+  }catch(err){console.error(err);msg('actualMsg',err.message||String(err),'error');}
+});
+function switchTo(v){['join','player','admin'].forEach(hide);show(v);}
