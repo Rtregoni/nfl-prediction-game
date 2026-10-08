@@ -9,4 +9,3 @@ window.firebaseConfig = {
   appId: "1:249033075576:web:90b0f51686fc4b09e0368d"
 };
 
-export default firebaseConfig;
