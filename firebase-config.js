@@ -1,7 +1,6 @@
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBh3ir11F5Ci2VExuU_5H8D5QVsWNR5Jd0",
   authDomain: "nfl-prediction-game-aa492.firebaseapp.com",
-  databaseURL: "https://nfl-prediction-game-aa492-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "nfl-prediction-game-aa492",
   storageBucket: "nfl-prediction-game-aa492.firebasestorage.app",
   messagingSenderId: "249033075576",
